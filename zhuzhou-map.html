@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>株洲市 3D 地图</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            overflow: hidden; 
+            background: #0a0a0f;
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+        #container { width: 100vw; height: 100vh; }
+        .title {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            font-size: 28px;
+            font-weight: 300;
+            letter-spacing: 8px;
+            text-shadow: 0 0 20px rgba(0,200,255,0.5);
+            z-index: 100;
+        }
+        .info {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.6);
+            font-size: 14px;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div class="title">株洲市</div>
+    <div id="container"></div>
+    <div class="info">拖拽旋转 · 滚轮缩放</div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // 株洲市各区简化坐标数据 (经纬度)
+        const districts = [
+            {
+                name: '天元区',
+                color: 0x00d4ff,
+                center: [113.116, 27.827],
+                points: [
+                    [113.05, 27.78], [113.08, 27.76], [113.12, 27.77], [113.15, 27.79],
+                    [113.18, 27.81], [113.17, 27.85], [113.14, 27.87], [113.10, 27.86], [113.05, 27.78]
+                ]
+            },
+            {
+                name: '芦淞区',
+                color: 0xff6b6b,
+                center: [113.127, 27.827],
+                points: [
+                    [113.10, 27.80], [113.12, 27.78], [113.14, 27.79], [113.15, 27.81],
+                    [113.16, 27.84], [113.14, 27.87], [113.11, 27.86], [113.09, 27.83], [113.10, 27.80]
+                ]
+            },
+            {
+                name: '石峰区',
+                color: 0x4ecdc4,
+                center: [113.085, 27.873],
+                points: [
+                    [113.03, 27.84], [113.05, 27.82], [113.08, 27.83], [113.10, 27.85],
+                    [113.11, 27.88], [113.09, 27.91], [113.05, 27.90], [113.02, 27.88], [113.03, 27.84]
+                ]
+            },
+            {
+                name: '荷塘区',
+                color: 0xffd93d,
+                center: [113.100, 27.866],
+                points: [
+                    [113.08, 27.85], [113.10, 27.83], [113.13, 27.85], [113.14, 27.87],
+                    [113.13, 27.90], [113.10, 27.91], [113.07, 27.89], [113.08, 27.85]
+                ]
+            },
+            {
+                name: '渌口区',
+                color: 0x6bcb77,
+                center: [113.145, 27.718],
+                points: [
+                    [113.11, 27.68], [113.13, 27.66], [113.17, 27.68], [113.20, 27.71],
+                    [113.19, 27.75], [113.16, 27.77], [113.12, 27.75], [113.11, 27.68]
+                ]
+            },
+            {
+                name: '醴陵市',
+                color: 0xc56cf0,
+                center: [113.497, 27.657],
+                points: [
+                    [113.40, 27.55], [113.45, 27.52], [113.52, 27.55], [113.58, 27.60],
+                    [113.60, 27.68], [113.58, 27.75], [113.52, 27.78], [113.45, 27.75],
+                    [113.41, 27.70], [113.40, 27.55]
+                ]
+            },
+            {
+                name: '攸县',
+                color: 0xff9f43,
+                center: [113.357, 27.008],
+                points: [
+                    [113.25, 26.90], [113.32, 26.88], [113.40, 26.92], [113.48, 27.00],
+                    [113.50, 27.08], [113.47, 27.16], [113.40, 27.18], [113.32, 27.14],
+                    [113.27, 27.08], [113.25, 26.90]
+                ]
+            },
+            {
+                name: '茶陵县',
+                color: 0x00d2d3,
+                center: [113.536, 26.784],
+                points: [
+                    [113.45, 26.68], [113.50, 26.65], [113.56, 26.70], [113.60, 26.78],
+                    [113.62, 26.88], [113.58, 26.95], [113.51, 26.96], [113.45, 26.90],
+                    [113.43, 26.80], [113.45, 26.68]
+                ]
+            },
+            {
+                name: '炎陵县',
+                color: 0xee5a24,
+                center: [113.773, 26.489],
+                points: [
+                    [113.65, 26.35], [113.72, 26.32], [113.80, 26.38], [113.88, 26.45],
+                    [113.92, 26.55], [113.90, 26.65], [113.83, 26.70], [113.75, 26.68],
+                    [113.68, 26.60], [113.65, 26.35]
+                ]
+            }
+        ];
+
+        // 场景设置
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0f);
+        
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 80, 120);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        // 轨道控制
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 1.0;
+        controls.minDistance = 50;
+        controls.maxDistance = 200;
+
+        // 灯光
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(50, 100, 50);
+        scene.add(directionalLight);
+
+        const pointLight = new THREE.PointLight(0x00d4ff, 0.5, 200);
+        pointLight.position.set(0, 50, 0);
+        scene.add(pointLight);
+
+        // 缩放函数 (经纬度转3D坐标)
+        const scale = 100;
+        const offsetLat = 27.0;
+        const offsetLng = 113.3;
+
+        function latLngTo3D(lat, lng) {
+            const x = (lng - offsetLng) * scale;
+            const z = (lat - offsetLat) * scale;
+            return { x, z };
+        }
+
+        // 创建区块
+        const meshes = [];
+        
+        districts.forEach(district => {
+            const shape = new THREE.Shape();
+            const points = district.points;
+            
+            const first = latLngTo3D(points[0][1], points[0][0]);
+            shape.moveTo(first.x, first.z);
+            
+            for (let i = 1; i < points.length; i++) {
+                const p = latLngTo3D(points[i][1], points[i][0]);
+                shape.lineTo(p.x, p.z);
+            }
+            
+            // 3D拉伸
+            const extrudeSettings = {
+                depth: 8 + Math.random() * 4,
+                bevelEnabled: true,
+                bevelThickness: 0.5,
+                bevelSize: 0.3,
+                bevelSegments: 2
+            };
+            
+            const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+            geometry.rotateX(-Math.PI / 2);
+            
+            // 材质
+            const material = new THREE.MeshPhongMaterial({
+                color: district.color,
+                emissive: district.color,
+                emissiveIntensity: 0.2,
+                shininess: 80,
+                transparent: true,
+                opacity: 0.85
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            
+            // 计算中心位置
+            const center = latLngTo3D(district.center[1], district.center[0]);
+            mesh.position.set(center.x, 0, center.z);
+            
+            // 动画数据
+            mesh.userData = {
+                originalY: 0,
+                floatSpeed: 0.5 + Math.random() * 0.5,
+                floatOffset: Math.random() * Math.PI * 2
+            };
+            
+            scene.add(mesh);
+            meshes.push(mesh);
+            
+            // 边框线
+            const edges = new THREE.EdgesGeometry(geometry);
+            const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.5, transparent: true });
+            const wireframe = new THREE.LineSegments(edges, lineMaterial);
+            wireframe.position.copy(mesh.position);
+            scene.add(wireframe);
+        });
+
+        // 底座
+        const baseGeometry = new THREE.CircleGeometry(80, 64);
+        const baseMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x1a1a2e,
+            transparent: true,
+            opacity: 0.8
+        });
+        const base = new THREE.Mesh(baseGeometry, baseMaterial);
+        base.rotation.x = -Math.PI / 2;
+        base.position.y = -2;
+        scene.add(base);
+
+        // 网格
+        const gridHelper = new THREE.GridHelper(160, 20, 0x333355, 0x222244);
+        gridHelper.position.y = -1;
+        scene.add(gridHelper);
+
+        // 动画循环
+        let time = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.016;
+            
+            // 悬浮动画
+            meshes.forEach(mesh => {
+                const { floatSpeed, floatOffset } = mesh.userData;
+                mesh.position.y = Math.sin(time * floatSpeed + floatOffset) * 1.5;
+            });
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        animate();
+
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
